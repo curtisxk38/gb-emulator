@@ -1,0 +1,172 @@
+main RAM
+VRAM
+SoC
+	CPU
+	Interrupt Controller
+	Timer
+	Memory
+	Boot ROM
+
+	Joypad input
+	Serial Data Transfer
+	Sound Controller
+	Pixel Processor Unit
+
+CPU
+	core features of 8080
+	some features of z80
+	some new features
+
+	registers
+	A - accumulator - special: arithmetic + logic
+	F - flags: Zero and Carry
+	B,C,D,E,H,L - 8 bit
+	combine B,C to BC
+	D,E to DE
+	H,L to HL
+	16 bit: BC,DE,HL can use as pointers
+
+	r16: bc,de,hl,sp
+	r8: A,B,C,D,E,h,l,(hl)
+						^ memory pointed to by HL
+
+	stack - can only push 16 bit regietsers
+	arith/logic only A can do
+	except can inc,dec on any
+
+	interrupts
+		jump to fix location in ram, different location based on interrupt type
+
+		rst 000 <- reset
+
+	supported z8 features
+		shifts, rotates, bit ops
+		relative jumps
+		return from interrupt
+
+	new features:
+	post increment, pre decrement
+	zero page
+		top most page
+		FF00 to FFFF
+
+		optimized instruction to access these
+
+		(instr takes less bytes and executes in less cycles)
+
+	swap nibbles
+	store sp
+	power saving
+
+	8 bit cpu, 16 bit address space
+		64KB
+			32KB ROM
+		Video Ram
+		Exernal RAM
+		RAM
+		empty
+		top 2 page
+			OAM RAM -special video ram
+			
+
+			I/O
+			HRAM
+			^^^ Zero Page
+
+		So games < 32KB?
+		 no, cartridge has > 32KB plus memory bank controller
+	32 KB:
+	0000 - 3FFF = ROM Bank 0
+	4000 - 7FFF = Rom Bank 1 .. n
+
+	Boot ROM
+	CPU runs at 0000
+		draws nintendo logo and chimes
+
+		compares logo to data
+		game must have logo, (which is copyrighted) to run
+		turn off boot rom
+
+
+	joypad input
+		8 inputs: L,R,U,D,Start,Select,A,B
+		6 GPIO, 2 columns, 4 rows
+
+		p14		p15
+		
+		D 		Start		P13
+		U 		Select		P12
+		L 		B 			P11
+		R 		A 			P10
+
+	serial data transfer
+
+	timer
+		countup until overflow
+
+	interrupt controller
+	5 interrupts
+		joypad
+		serial
+		timer - overflow
+		lcd stat
+		v-blank
+
+	sound controller
+		4 voices
+			5 registers for each voice
+			~ Control,Frequency,Volume,Length,Sweep
+		4 voices:
+			pulse A,B
+			wave
+			noise
+
+	PPU
+	12 registers
+	160x144 pixels
+	4 shades of gray
+	8x8 pixel tile
+	16 bytes to describe tile
+
+	20 tiles by 18 tiles on screen
+
+	video ram is actually 32 x 32 tiles, but screen is viewport onto it
+		scrolling moves view port around
+
+	scroll more than 32? viewport wraps around
+		have to draw new columns in fast enough
+
+	window overlays background
+		doenst scroll
+
+	sprites: 
+		don't need to fit into 8x8 tile
+		sprites aka object
+
+		OAM entry
+			pos x
+			pos y
+			tile number
+			flip x bit
+			flip y bit
+			palette bit
+				which 3 colors out of the 4 you want (transparency)
+					2 options of which palette
+			priority bit
+				if p = 1
+				will draw behind all background that isn't the first color
+
+	40 sprites on screen
+	10 sprites on a line
+
+	OAM Ram starts at FE00, stores 40 sprites
+
+	VRAM memory map
+	4 KB sprite tiles
+	4 KB BG tiles
+	1 KB Window map
+	1 KB background map
+
+	vertical timing
+	top to bottom, left to right draw on screen
+	60 times a second
