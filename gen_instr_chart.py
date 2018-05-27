@@ -8,13 +8,17 @@ def scrape():
 	page = requests.get(url)
 	bs = BeautifulSoup(page.content, "html.parser")
 
-	main_ops = parse_table(bs.table)
+	tables = bs.find_all("table")
 
-	serialized = json.dumps(main_ops)
-	
-	with open("main_ops.json", "w") as f:
+	main_ops = parse_table(tables[0])
+	cb_ops = parse_table(tables[1])
+
+	all_ops = {"main": main_ops, "cb_prefix": cb_ops}
+
+	serialized = json.dumps(all_ops)
+
+	with open("opcode_details.json", "w") as f:
 		f.write(serialized)
-
 
 
 def parse_table(table):
