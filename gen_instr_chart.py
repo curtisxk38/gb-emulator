@@ -11,7 +11,7 @@ def scrape():
 	main_ops = parse_table(bs.table)
 
 	serialized = json.dumps(main_ops)
-
+	
 	with open("main_ops.json", "w") as f:
 		f.write(serialized)
 
