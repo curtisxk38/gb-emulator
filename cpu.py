@@ -1,5 +1,4 @@
 import json
-import binascii
 
 import memory
 
@@ -16,7 +15,7 @@ class CPU:
 		self.sp = 0
 		self.pc = 0
 
-		self.flags = {"Z":0,"N":0,"H":0,"C":0}
+		self.flags = [False, False, False, False] # Z, N ,H, C
 
 		self.endianness = "little"
 
@@ -60,13 +59,11 @@ class CPU:
 		self.h = value >> 8
 		self.l = value & 0xFF
 
-	def update(self):
+	def update(self, is_debug):
 		while True:
 			opcode_details = self.decode()
 			print(opcode_details["name"])
 			length = int(opcode_details["length"])
-			#opcode = self.memory[self.pc:self.pc+length]
-			#print("{}:{} -> {}".format(self.pc, length, binascii.hexlify(opcode)))
 			
 			name = opcode_details["name"].split(" ")
 			mnemonic = name[0]
@@ -76,7 +73,33 @@ class CPU:
 				args = None
 			flags = opcode_details["flags"]
 
-			if mnemonic == "LD":
+			# default new pc
+			new_pc = self.pc + length
+
+			if False:
+				# temporary until all instructions are implemented
+				pass
+			elif mnemonic == "BIT":
+				bit = int(args[0])
+				if args[1][0] == "(":
+					to_test = self.memory[self.hl]
+				else:
+					to_test = getattr(self, args[1].lower())
+				val = bit & to_test
+				self.set_flags(flags, val)
+			elif mnemonic == "JR":
+				if len(args) == 1:
+					new_pc = self.pc + self.get_immediate(1)
+				elif (args[0] == "Z" and self.flags[0]) \
+						or (args[0] == "C" and self.flags[3]) \
+						or (args[0] == "NZ" and not self.flags[0]) \
+						or (args[0] == "NC" and not self.flags[3]):
+						new_pc = self.pc + self.get_immediate(1)
+				else:
+					raise NotImplementedError
+
+
+			elif mnemonic == "LD":
 				self.load(args)
 			elif mnemonic == "XOR":
 				if args[0] == "(HL)":
@@ -86,10 +109,15 @@ class CPU:
 					self.a = val
 					self.set_flags(flags, val)
 
-			self.pc += length
+			self.pc = new_pc
+
+			if is_debug:
+				# wait for input to before next step
+				input()
 
 	def get_immediate(self, size_in_bytes):
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
+		print(im)
 		im = int.from_bytes(im, self.endianness)
 		return im
 		
@@ -145,11 +173,26 @@ class CPU:
 		else:
 			# set register
 			setattr(self, args[0].lower(), val)
-			print("{} <- {}".format(args[0].lower(), val))
 
 	def set_flags(self, op_flags, val):
-		if op_flags[0] == "Z" and val == 0:
-			self.flags["Z"] = 1
+		for i, op_flag in enumerate(op_flags):
+			if op_flag == "0":
+				self.flags[i] = False
+			elif op_flag == "1":
+				self.flags[i] = True
+			elif op_flag == "-":
+				# don't change this flag
+				pass
+			else:
+				if i == 0 and val == 0:
+					# Z flag
+					self.flags[i] = True
+				elif i == 1:
+					pass
+				elif i == 2:
+					pass
+				elif i == 3:
+					pass
 
 
 	def decode(self):
