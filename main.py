@@ -3,7 +3,6 @@ import argparse
 
 from cpu import CPU
 
-
 def main():
 	bootstrap_rom = "DMG_ROM.bin"
 
@@ -18,7 +17,8 @@ def main():
 	rom = list(rom)
 	cpu = CPU()
 	cpu.memory[:len(rom)] = rom
-	cpu.update(args.debug)
+	while True:
+		cpu.update(args.debug)
 
 
 

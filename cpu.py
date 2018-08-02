@@ -60,60 +60,65 @@ class CPU:
 		self.l = value & 0xFF
 
 	def update(self, is_debug):
-		while True:
-			opcode_details = self.decode()
-			print(opcode_details["name"])
-			length = int(opcode_details["length"])
-			
-			name = opcode_details["name"].split(" ")
-			mnemonic = name[0]
-			try:
-				args = name[1].split(",")
-			except IndexError:
-				args = None
-			flags = opcode_details["flags"]
+		
+		opcode_details = self.decode()
+		print(opcode_details["name"])
+		length = int(opcode_details["length"])
+		
+		name = opcode_details["name"].split(" ")
+		mnemonic = name[0]
+		try:
+			args = name[1].split(",")
+		except IndexError:
+			args = None
+		flags = opcode_details["flags"]
 
-			# default new pc
-			new_pc = self.pc + length
+		# default new pc
+		new_pc = self.pc + length
 
-			if False:
-				# temporary until all instructions are implemented
-				pass
-			elif mnemonic == "BIT":
-				bit = int(args[0])
-				if args[1][0] == "(":
-					to_test = self.memory[self.hl]
-				else:
-					to_test = getattr(self, args[1].lower())
-				val = 1 & (to_test >> bit)
-				self.set_flags(flags, val)
-			elif mnemonic == "JR":
-				if len(args) == 1:
+		if False:
+			# temporary until all instructions are implemented
+			pass
+		elif mnemonic == "BIT":
+			bit = int(args[0])
+			if args[1][0] == "(":
+				to_test = self.memory[self.hl]
+			else:
+				to_test = getattr(self, args[1].lower())
+			val = 1 & (to_test >> bit)
+			self.set_flags(flags, val)
+		elif mnemonic == "JR":
+			if len(args) == 1:
+				new_pc = self.pc + self.get_immediate(1)
+			elif (args[0] == "Z" and self.flags[0]) \
+					or (args[0] == "C" and self.flags[3]) \
+					or (args[0] == "NZ" and not self.flags[0]) \
+					or (args[0] == "NC" and not self.flags[3]):
 					new_pc = self.pc + self.get_immediate(1)
-				elif (args[0] == "Z" and self.flags[0]) \
-						or (args[0] == "C" and self.flags[3]) \
-						or (args[0] == "NZ" and not self.flags[0]) \
-						or (args[0] == "NC" and not self.flags[3]):
-						new_pc = self.pc + self.get_immediate(1)
+		
+		elif mnemonic == "LD":
+			self.load(args)
+		elif mnemonic == "XOR":
+			if args[0] == "(HL)":
+				raise NotImplementedError
+			else:
+				val = self.a ^ getattr(self, args[0].lower())
+				self.a = val
+				self.set_flags(flags, val)
+
+		self.pc = new_pc
+		
+		if is_debug:
+			# wait for input to before next step
+			while True:
+				cmd = input(">")
+				if cmd == "step":
+					break
 				else:
-					raise NotImplementedError
-
-
-			elif mnemonic == "LD":
-				self.load(args)
-			elif mnemonic == "XOR":
-				if args[0] == "(HL)":
-					raise NotImplementedError
-				else:
-					val = self.a ^ getattr(self, args[0].lower())
-					self.a = val
-					self.set_flags(flags, val)
-
-			self.pc = new_pc
-
-			if is_debug:
-				# wait for input to before next step
-				input()
+					try:
+						eval(cmd)
+					except Exception as e:
+						print(e)
 
 	def get_immediate(self, size_in_bytes):
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
@@ -148,6 +153,10 @@ class CPU:
 					address = self.get_immediate(2)
 				else:
 					address = getattr(self, reg_name.lower())
+
+				if reg_name == "C":
+					address += 0xFF00
+				
 				val = self.memory[address]
 		else:
 			# load from register
@@ -168,6 +177,10 @@ class CPU:
 					address = self.get_immediate(2)
 				else:
 					address = getattr(self, reg_name.lower())
+
+				if reg_name == "C":
+					address += 0xFF00
+				
 				self.memory[address] = val
 
 		else:
