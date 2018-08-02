@@ -85,7 +85,7 @@ class CPU:
 					to_test = self.memory[self.hl]
 				else:
 					to_test = getattr(self, args[1].lower())
-				val = bit & to_test
+				val = 1 & (to_test >> bit)
 				self.set_flags(flags, val)
 			elif mnemonic == "JR":
 				if len(args) == 1:
