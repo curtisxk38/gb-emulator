@@ -170,3 +170,7 @@ CPU
 	vertical timing
 	top to bottom, left to right draw on screen
 	60 times a second
+
+http://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+http://gbdev.gg8.se/wiki/articles/Gameboy_Bootstrap_ROM
+http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
