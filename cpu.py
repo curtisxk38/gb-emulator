@@ -13,7 +13,9 @@ class CPU:
 		self.l = 0
 
 		self.sp = 0
-		self.pc = 0
+		# pcl and pch make up program counter
+		self.pcl = 0
+		self.pch = 0
 
 		self.flags = [False, False, False, False] # Z, N ,H, C
 
@@ -31,6 +33,15 @@ class CPU:
 			raise FileNotFoundError("Unable to load {} file. You may need to run gen_instr_chart.py".format(opcode_details_file))
 		self.main_opcodes = opcodes["main"]
 		self.cb_opcodes = opcodes["cb_prefix"]
+
+	@property
+	def pc(self):
+		return (self.pch << 8) | self.pcl
+	
+	@pc.setter
+	def pc(self, value):
+		self.pch = value >> 8
+		self.pcl = value & 0xFF
 
 	@property
 	def bc(self):
@@ -87,17 +98,27 @@ class CPU:
 				to_test = getattr(self, args[1].lower())
 			val = 1 & (to_test >> bit)
 			self.set_flags(flags, val)
+		elif mnemonic == "CALL":
+			if len(args) == 1 or self.check_cc(args[0]):
+				# push address of next instruction
+				self.memory[self.sp - 1] = self.pch
+				self.memory[self.sp - 2] = self.pcl
+				# update pc to be immediate
+				new_pc = self.get_immediate(1)
+				# update stack pointer
+				self.sp = self.sp - 2
 		elif mnemonic == "JR":
-			if len(args) == 1:
+			if len(args) == 1 or self.check_cc(args[0]):
 				new_pc = self.pc + self.get_immediate(1)
-			elif (args[0] == "Z" and self.flags[0]) \
-					or (args[0] == "C" and self.flags[3]) \
-					or (args[0] == "NZ" and not self.flags[0]) \
-					or (args[0] == "NC" and not self.flags[3]):
-					new_pc = self.pc + self.get_immediate(1)
-		
 		elif mnemonic == "LD":
-			self.load(args)
+			self.ld(args)
+		elif mnemonic == "LDH":
+			if args[1] == "A":
+				# LDH (a8),A
+				self.memory[0xFF00 + self.get_immediate(1)] = self.a
+			else:
+				# LDH A,(a8)
+				self.a = self.memory[0xFF00 + self.get_immediate(1)]
 		elif mnemonic == "XOR":
 			if args[0] == "(HL)":
 				raise NotImplementedError
@@ -112,7 +133,7 @@ class CPU:
 			# wait for input to before next step
 			while True:
 				cmd = input(">")
-				if cmd == "step":
+				if cmd == "step" or cmd == "":
 					break
 				else:
 					try:
@@ -120,14 +141,7 @@ class CPU:
 					except Exception as e:
 						print(e)
 
-	def get_immediate(self, size_in_bytes):
-		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
-		print(im)
-		im = int.from_bytes(im, self.endianness)
-		return im
-		
-
-	def load(self, args):
+	def ld(self, args):
 		"""
 		Execute Load instructions "LD" 
 		(also "LDD", "LDI" mnemonics under different naming schemes)
@@ -187,6 +201,12 @@ class CPU:
 			# set register
 			setattr(self, args[0].lower(), val)
 
+	def get_immediate(self, size_in_bytes):
+		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
+		print(im)
+		im = int.from_bytes(im, self.endianness)
+		return im
+		
 	def set_flags(self, op_flags, val):
 		for i, op_flag in enumerate(op_flags):
 			if op_flag == "0":
@@ -207,6 +227,11 @@ class CPU:
 				elif i == 3:
 					pass
 
+	def check_cc(self, cc):
+		return (cc == "Z" and self.flags[0]) \
+			or (cc == "C" and self.flags[3]) \
+			or (cc == "NZ" and not self.flags[0]) \
+			or (cc == "NC" and not self.flags[3])
 
 	def decode(self):
 		first_byte = self.memory[self.pc]
