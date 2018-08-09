@@ -4,6 +4,7 @@ import memory
 
 class CPU:
 	def __init__(self):
+		# 8 bit registers
 		self.a = 0
 		self.b = 0
 		self.c = 0
@@ -12,10 +13,8 @@ class CPU:
 		self.h = 0
 		self.l = 0
 
-		self.sp = 0
-		# pcl and pch make up program counter
-		self.pcl = 0
-		self.pch = 0
+		self.sp = 0 # stack pointer
+		self.pc = 0 # program counter
 
 		self.flags = [False, False, False, False] # Z, N ,H, C
 
@@ -33,15 +32,6 @@ class CPU:
 			raise FileNotFoundError("Unable to load {} file. You may need to run gen_instr_chart.py".format(opcode_details_file))
 		self.main_opcodes = opcodes["main"]
 		self.cb_opcodes = opcodes["cb_prefix"]
-
-	@property
-	def pc(self):
-		return (self.pch << 8) | self.pcl
-	
-	@pc.setter
-	def pc(self, value):
-		self.pch = value >> 8
-		self.pcl = value & 0xFF
 
 	@property
 	def bc(self):
@@ -71,7 +61,9 @@ class CPU:
 		self.l = value & 0xFF
 
 	def update(self, is_debug):
-		
+		"""
+		Execute one instruction from memory[PC]
+		"""
 		opcode_details = self.decode()
 		print(opcode_details["name"])
 		length = int(opcode_details["length"])
@@ -101,12 +93,17 @@ class CPU:
 		elif mnemonic == "CALL":
 			if len(args) == 1 or self.check_cc(args[0]):
 				# push address of next instruction
-				self.memory[self.sp - 1] = self.pch
-				self.memory[self.sp - 2] = self.pcl
+				self.push_val(self.pc)
 				# update pc to be immediate
 				new_pc = self.get_immediate(1)
-				# update stack pointer
-				self.sp = self.sp - 2
+		elif mnemonic == "INC":
+			if args[0] == "(HL)":
+				val = self.memory[self.hl] + 1
+				self.memory[self.hl] = val
+			else:
+				val = getattr(self, args[0].lower())
+				setattr(self, args[0].lower(), val)
+			self.set_flags(flags, val)
 		elif mnemonic == "JR":
 			if len(args) == 1 or self.check_cc(args[0]):
 				new_pc = self.pc + self.get_immediate(1)
@@ -119,13 +116,20 @@ class CPU:
 			else:
 				# LDH A,(a8)
 				self.a = self.memory[0xFF00 + self.get_immediate(1)]
+		elif mnemonic == "PUSH":
+				# get val from a 16bit register
+				val = getattr(self, args[0].lower())
+				self.push_val(val)
 		elif mnemonic == "XOR":
 			if args[0] == "(HL)":
-				raise NotImplementedError
+				val = self.a ^ self.memory[self.hl]
 			else:
 				val = self.a ^ getattr(self, args[0].lower())
-				self.a = val
-				self.set_flags(flags, val)
+			self.a = val
+			self.set_flags(flags, val)
+		else:
+			print("Unkown operation: {}".format(mnemonic))
+			raise NotImplementedError
 
 		self.pc = new_pc
 		
@@ -201,13 +205,34 @@ class CPU:
 			# set register
 			setattr(self, args[0].lower(), val)
 
+	def push_val(self, val):
+		"""
+		push 16bit value onto stack
+		"""
+		# split into two 8 bit values
+		low, high = self.split_16(val)
+		# put on stack
+		self.memory[self.sp - 1] = high
+		self.memory[self.sp - 2] = low
+		# update stack pointer
+		self.sp = self.sp - 2
+
 	def get_immediate(self, size_in_bytes):
+		"""
+		Get the immediate value of size_in_bytes for the current instruction
+		all instructions have 1 byte for the opcode, so we always start 1 after the PC
+		"""
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
 		print(im)
 		im = int.from_bytes(im, self.endianness)
 		return im
 		
 	def set_flags(self, op_flags, val):
+		"""
+		op_flags - list of what flags to set or reset based on the instruction the resultant value
+		val - value that resulted from running the current instruction
+		Set the flags based on the result of the current instruction
+		"""
 		for i, op_flag in enumerate(op_flags):
 			if op_flag == "0":
 				self.flags[i] = False
@@ -224,16 +249,31 @@ class CPU:
 					pass
 				elif i == 2:
 					pass
-				elif i == 3:
-					pass
+				elif i == 3 and val > 0xFF:
+					# C
+					self.flags[i] = True
 
 	def check_cc(self, cc):
+		"""
+		Check whether the condition code parameter is true based on the flags
+		"""
 		return (cc == "Z" and self.flags[0]) \
 			or (cc == "C" and self.flags[3]) \
 			or (cc == "NZ" and not self.flags[0]) \
 			or (cc == "NC" and not self.flags[3])
 
+	def split_16(self, val_16bit):
+		"""
+		split 16bit value into 2 8 bit values
+		"""
+		low = val_16bit & 0x00FF
+		high = val_16bit >> 8
+		return low, high
+
 	def decode(self):
+		"""
+		Decode machine code instruction into parsable format
+		"""
 		first_byte = self.memory[self.pc]
 		if first_byte == 0xCB:
 			# use 2nd byte of instruction to key the cb_opcodes
