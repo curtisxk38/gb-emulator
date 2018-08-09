@@ -22,6 +22,7 @@ class CPU:
 
 		# 64K RAM
 		self.memory = memory.Memory()
+		self.interrupts_enabled = True
 
 		opcode_details_file = "opcode_details.json"
 
@@ -74,7 +75,6 @@ class CPU:
 			args = name[1].split(",")
 		except IndexError:
 			args = None
-		flags = opcode_details["flags"]
 
 		# default new pc
 		new_pc = self.pc + length
@@ -82,6 +82,13 @@ class CPU:
 		if False:
 			# temporary until all instructions are implemented
 			pass
+		elif mnemonic == "ADD":
+			val = getattr(self, args[0].lower())
+			if args[1] == "(HL)":
+				val += self.memory[self.hl]
+			elif args[1] == "d8" or args[1] == "r8":
+				val += self.get_immediate(1)
+			setattr(self, args[0].lower(), val)
 		elif mnemonic == "BIT":
 			bit = int(args[0])
 			if args[1][0] == "(":
@@ -89,21 +96,28 @@ class CPU:
 			else:
 				to_test = getattr(self, args[1].lower())
 			val = 1 & (to_test >> bit)
-			self.set_flags(flags, val)
 		elif mnemonic == "CALL":
 			if len(args) == 1 or self.check_cc(args[0]):
 				# push address of next instruction
 				self.push_val(self.pc)
 				# update pc to be immediate
 				new_pc = self.get_immediate(1)
+		elif mnemonic == "DEC":
+			if args[0] == "(HL)":
+				val = self.memory[self.hl] - 1
+				self.memory[self.hl] = val
+			else:
+				val = getattr(self, args[0].lower()) - 1
+				setattr(self, args[0].lower(), val)
+		elif mnemonic == "DI":
+			self.interrupts_enabled = False
 		elif mnemonic == "INC":
 			if args[0] == "(HL)":
 				val = self.memory[self.hl] + 1
 				self.memory[self.hl] = val
 			else:
-				val = getattr(self, args[0].lower())
+				val = getattr(self, args[0].lower()) + 1
 				setattr(self, args[0].lower(), val)
-			self.set_flags(flags, val)
 		elif mnemonic == "JR":
 			if len(args) == 1 or self.check_cc(args[0]):
 				new_pc = self.pc + self.get_immediate(1)
@@ -116,21 +130,62 @@ class CPU:
 			else:
 				# LDH A,(a8)
 				self.a = self.memory[0xFF00 + self.get_immediate(1)]
+		elif mnemonic == "NOP":
+			pass
+		elif mnemonic == "POP":
+			if args[0] == "AF":
+				raise NotImplementedError
+			self.pop_val(args[0].lower())
 		elif mnemonic == "PUSH":
-				# get val from a 16bit register
+			if args[0] == "AF":
+				raise NotImplementedError
+			# get val from a 16bit register
+			val = getattr(self, args[0].lower())
+			self.push_val(val)
+		elif mnemonic == "RL":
+			if args[0] == "(HL)":
+				val = self.memory[self.hl]
+			else:
 				val = getattr(self, args[0].lower())
-				self.push_val(val)
+			# save high bit of value 
+			bit7 = (val >> 7) & 1
+			# rotate to the left
+			val = (val << 1) & 0xFF
+			# put carry flag value into bit 0
+			val = val | int(self.flags[3])
+			# save old bit7 into carry flag
+			self.flags[3] = bit7
+			if args[0] == "(HL)":
+				self.memory[self.hl] = val
+			else:
+				setattr(self, args[0].lower(), val)
+		elif mnemonic == "RLA":
+			val = self.a
+			# save high bit of value 
+			bit7 = (val >> 7) & 1
+			# rotate to the left
+			val = (val << 1) & 0xFF
+			# put carry flag value into bit 0
+			val = val | int(self.flags[3])
+			# save old bit7 into carry flag
+			self.flags[3] = bit7
+			self.a = val
 		elif mnemonic == "XOR":
 			if args[0] == "(HL)":
 				val = self.a ^ self.memory[self.hl]
 			else:
 				val = self.a ^ getattr(self, args[0].lower())
 			self.a = val
-			self.set_flags(flags, val)
 		else:
 			print("Unkown operation: {}".format(mnemonic))
 			raise NotImplementedError
 
+		try:
+			self.set_flags(opcode_details["flags"], val)
+		except UnboundLocalError:
+			# val wasn't set to anything
+			# not sure if the next line is correct
+			self.set_flags(opcode_details["flags"], None)
 		self.pc = new_pc
 		
 		if is_debug:
@@ -204,6 +259,13 @@ class CPU:
 		else:
 			# set register
 			setattr(self, args[0].lower(), val)
+
+	def pop_val(self, reg_name):
+		low = self.memory[self.sp]
+		high = self.memory[self.sp + 1]
+		new = (high << 8) | low
+		self.sp = self.sp + 2
+		setattr(self, reg_name, new)
 
 	def push_val(self, val):
 		"""
