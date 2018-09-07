@@ -9,5 +9,8 @@ class Memory:
 
 	def __setitem__(self, key, value):
 		# byte must be in range	[0, ..., 255]
-		#value = value % 256
+		value = value % 256
 		self.memory[key] = value
+
+	def load_rom(self, rom):
+		self.memory[:len(rom)] = rom
