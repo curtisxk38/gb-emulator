@@ -103,6 +103,14 @@ class CPU:
 				self.push_val(new_pc)
 				# update pc to be immediate
 				new_pc = self.get_immediate(1)
+		elif mnemonic == "CP":
+			if args[0] == "(HL)":
+				n = self.memory[self.hl]
+			elif args[0] == "d8":
+				n = self.get_immediate(1)
+			else:
+				n = getattr(self, args[0].lower())
+			val = self.a - n
 		elif mnemonic == "DEC":
 			if args[0] == "(HL)":
 				val = self.memory[self.hl] - 1
@@ -149,9 +157,9 @@ class CPU:
 			if args is None or self.check_cc(args[0]):
 				low = self.memory[self.sp]
 				high = self.memory[self.sp + 1]
-				value = (high << 8) | low
+				stack_val = (high << 8) | low
 				self.sp = self.sp + 2
-				new_pc = value
+				new_pc = stack_val
 				if is_debug:
 					print("Return taken!")
 		elif mnemonic == "RL":
@@ -181,6 +189,15 @@ class CPU:
 			val = val | int(self.flags[3])
 			# save old bit7 into carry flag
 			self.flags[3] = bit7
+			self.a = val
+		elif mnemonic == "SUB":
+			if args[0] == "(HL)":
+				n = self.memory[self.hl]
+			elif args[0] == "d8":
+				n = self.get_immediate(1)
+			else:
+				n = getattr(self, args[0].lower())
+			val = self.a - n
 			self.a = val
 		elif mnemonic == "XOR":
 			if args[0] == "(HL)":
