@@ -100,7 +100,7 @@ class CPU:
 		elif mnemonic == "CALL":
 			if len(args) == 1 or self.check_cc(args[0]):
 				# push address of next instruction
-				self.push_val(self.pc)
+				self.push_val(new_pc)
 				# update pc to be immediate
 				new_pc = self.get_immediate(1)
 		elif mnemonic == "DEC":
@@ -145,6 +145,15 @@ class CPU:
 			# get val from a 16bit register
 			val = getattr(self, args[0].lower())
 			self.push_val(val)
+		elif mnemonic == "RET":
+			if args is None or self.check_cc(args[0]):
+				low = self.memory[self.sp]
+				high = self.memory[self.sp + 1]
+				value = (high << 8) | low
+				self.sp = self.sp + 2
+				new_pc = value
+				if is_debug:
+					print("Return taken!")
 		elif mnemonic == "RL":
 			if args[0] == "(HL)":
 				val = self.memory[self.hl]
@@ -266,9 +275,9 @@ class CPU:
 	def pop_val(self, reg_name):
 		low = self.memory[self.sp]
 		high = self.memory[self.sp + 1]
-		new = (high << 8) | low
+		value = (high << 8) | low
 		self.sp = self.sp + 2
-		setattr(self, reg_name, new)
+		setattr(self, reg_name, value)
 
 	def push_val(self, val):
 		"""
