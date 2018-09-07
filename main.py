@@ -2,6 +2,7 @@ import json
 import argparse
 
 from cpu import CPU
+from memory import Memory
 
 import pygame
 
@@ -14,7 +15,8 @@ class Control():
 		self.game_done = False
 		self.CLOCK = pygame.time.Clock()
 
-		self.cpu = CPU()
+		self.memory = Memory()
+		self.cpu = CPU(self.memory)
 
 	def setup(self):
 		with open(self.config.rom_path, "rb") as f:

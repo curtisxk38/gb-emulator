@@ -1,9 +1,8 @@
 import json
 
-import memory
 
 class CPU:
-	def __init__(self):
+	def __init__(self, memory):
 		# 8 bit registers
 		self.a = 0
 		self.b = 0
@@ -21,7 +20,7 @@ class CPU:
 		self.endianness = "little"
 
 		# 64K RAM
-		self.memory = memory.Memory()
+		self.memory = memory
 		self.interrupts_enabled = True
 
 		opcode_details_file = "opcode_details.json"
@@ -86,8 +85,10 @@ class CPU:
 			val = getattr(self, args[0].lower())
 			if args[1] == "(HL)":
 				val += self.memory[self.hl]
-			elif args[1] == "d8" or args[1] == "r8":
+			elif args[1] == "d8":
 				val += self.get_immediate(1)
+			elif args[1] == "r8":
+				val += self.get_immediate(1, signed=True)
 			setattr(self, args[0].lower(), val)
 		elif mnemonic == "BIT":
 			bit = int(args[0])
@@ -120,7 +121,9 @@ class CPU:
 				setattr(self, args[0].lower(), val)
 		elif mnemonic == "JR":
 			if len(args) == 1 or self.check_cc(args[0]):
-				new_pc = self.pc + self.get_immediate(1)
+				new_pc += self.get_immediate(1, signed=True)
+				if is_debug:
+					print("Jump taken!")
 		elif mnemonic == "LD":
 			self.ld(args)
 		elif mnemonic == "LDH":
@@ -279,7 +282,7 @@ class CPU:
 		# update stack pointer
 		self.sp = self.sp - 2
 
-	def get_immediate(self, size_in_bytes):
+	def get_immediate(self, size_in_bytes, signed=False):
 		"""
 		Get the immediate value of size_in_bytes for the current instruction
 		all instructions have 1 byte for the opcode, so we always start 1 after the PC
@@ -287,6 +290,11 @@ class CPU:
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
 		print(im)
 		im = int.from_bytes(im, self.endianness)
+
+		# the only signed immediates are 1 byte (r8 in JR and ADD instructions)
+		#  so we this conversion to a signed value is only made to work for 1 byte signed values
+		if signed and im > 127:
+			return (256 - im) * -1
 		return im
 		
 	def set_flags(self, op_flags, val):
