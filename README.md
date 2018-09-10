@@ -1,3 +1,14 @@
+A GameBoy emulator written in python.
+
+## Install
+```
+pip install pygame
+```
+
+## Run
+```
+python3 main.py --help
+```
 
 ## Generating instruction chart
 
