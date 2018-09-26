@@ -82,6 +82,8 @@ class CPU:
 
 		# debug stuff
 		if self.pc in self.breakpoints:
+			bp_hit = self.breakpoints.index(self.pc)
+			print("Hit Breakpoint {}".format(bp_hit + 1))
 			self.stepping = True
 
 		if self.is_debug and self.stepping:
@@ -104,7 +106,9 @@ class CPU:
 					break
 				elif debug_args[0] == "delete" or debug_args[0] == "d":
 					# breakpoint numbers indexed at 1
-					self.breakpoints[int(debug_args[1]) - 1] = None # pc will never be None
+					bp = int(debug_args[1]) - 1
+					self.breakpoints[bp] = None # pc will never be None
+					print("Removed breakpoint {}".format(debug_args[1]))
 				else:
 					try:
 						eval(cmd)
@@ -338,7 +342,8 @@ class CPU:
 		all instructions have 1 byte for the opcode, so we always start 1 after the PC
 		"""
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
-		print(im)
+		if self.debug:
+			print("\t{}".format(im))
 		im = int.from_bytes(im, self.endianness)
 
 		# the only signed immediates are 1 byte (r8 in JR and ADD instructions)
