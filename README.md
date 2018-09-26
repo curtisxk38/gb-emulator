@@ -6,6 +6,11 @@ pip install pygame
 ```
 
 ## Run
+Start running with a given rom:
+```
+python3 main.py -r path_to_rom.gb
+```
+For more options see:
 ```
 python3 main.py --help
 ```
