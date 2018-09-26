@@ -16,7 +16,7 @@ class Control():
 		self.CLOCK = pygame.time.Clock()
 
 		self.memory = Memory()
-		self.cpu = CPU(self.memory)
+		self.cpu = CPU(self.memory, self.config.debug)
 
 	def setup(self):
 		with open(self.config.rom_path, "rb") as f:
@@ -26,7 +26,7 @@ class Control():
 
 	def update(self):
 		# update cpu and draw
-		self.cpu.update(self.config.debug)
+		self.cpu.update()
 
 		background = pygame.Surface(self.screen.get_size())
 		background = background.convert()

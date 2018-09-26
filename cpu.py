@@ -2,7 +2,7 @@ import json
 
 
 class CPU:
-	def __init__(self, memory):
+	def __init__(self, memory, is_debug):
 		# 8 bit registers
 		self.a = 0
 		self.b = 0
@@ -33,6 +33,11 @@ class CPU:
 		self.main_opcodes = opcodes["main"]
 		self.cb_opcodes = opcodes["cb_prefix"]
 
+		# debug stuff
+		self.is_debug = is_debug
+		self.stepping = True
+		self.breakpoints = []
+
 	@property
 	def bc(self):
 		return (self.b << 8) | self.c
@@ -60,7 +65,7 @@ class CPU:
 		self.h = value >> 8
 		self.l = value & 0xFF
 
-	def update(self, is_debug):
+	def update(self):
 		"""
 		Execute one instruction from memory[PC]
 		"""
@@ -74,6 +79,37 @@ class CPU:
 			args = name[1].split(",")
 		except IndexError:
 			args = None
+
+		# debug stuff
+		if self.pc in self.breakpoints:
+			self.stepping = True
+
+		if self.is_debug and self.stepping:
+			# wait for input to before next step
+			while True:
+				cmd = input(">")
+				debug_args = cmd.split(" ")
+				if debug_args[0] == "step" or cmd == "":
+					break
+				elif debug_args[0] == "break" or debug_args[0] == "b":
+					if debug_args[1][:2] == "0x":
+						addr = int(debug_args[1], 16)
+					else:
+						addr = int(debug_args[1])
+					self.breakpoints.append(addr)
+					# breakpoints displayed as indexing at 1
+					print("Breakpoint {} set at {}".format(len(self.breakpoints), addr))
+				elif debug_args[0] == "continue" or debug_args[0] == "c":
+					self.stepping = False
+					break
+				elif debug_args[0] == "delete" or debug_args[0] == "d":
+					# breakpoint numbers indexed at 1
+					self.breakpoints[int(debug_args[1]) - 1] = None # pc will never be None
+				else:
+					try:
+						eval(cmd)
+					except Exception as e:
+						print(e)
 
 		# default new pc
 		new_pc = self.pc + length
@@ -130,7 +166,7 @@ class CPU:
 		elif mnemonic == "JR":
 			if len(args) == 1 or self.check_cc(args[0]):
 				new_pc += self.get_immediate(1, signed=True)
-				if is_debug:
+				if self.is_debug:
 					print("Jump taken!")
 		elif mnemonic == "LD":
 			self.ld(args)
@@ -160,7 +196,7 @@ class CPU:
 				stack_val = (high << 8) | low
 				self.sp = self.sp + 2
 				new_pc = stack_val
-				if is_debug:
+				if self.is_debug:
 					print("Return taken!")
 		elif mnemonic == "RL":
 			if args[0] == "(HL)":
@@ -216,18 +252,6 @@ class CPU:
 			# not sure if the next line is correct
 			self.set_flags(opcode_details["flags"], None)
 		self.pc = new_pc
-		
-		if is_debug:
-			# wait for input to before next step
-			while True:
-				cmd = input(">")
-				if cmd == "step" or cmd == "":
-					break
-				else:
-					try:
-						eval(cmd)
-					except Exception as e:
-						print(e)
 
 	def ld(self, args):
 		"""
@@ -338,16 +362,16 @@ class CPU:
 				# don't change this flag
 				pass
 			else:
-				if i == 0 and val == 0:
+				if i == 0:
 					# Z flag
-					self.flags[i] = True
+					self.flags[i] = val == 0
 				elif i == 1:
 					pass
 				elif i == 2:
 					pass
-				elif i == 3 and val > 0xFF:
-					# C
-					self.flags[i] = True
+				elif i == 3:
+					# C flag
+					self.flags[i] = val > 0xFF
 
 	def check_cc(self, cc):
 		"""
