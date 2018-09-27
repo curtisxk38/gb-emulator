@@ -53,6 +53,9 @@ class Control():
 	def main(self):
 		lag = 0.0
 		while not self.game_done:
+			self.event_loop()
+			self.update()
+		while not self.game_done:
 			lag += self.CLOCK.tick()
 
 			self.event_loop()

@@ -70,7 +70,7 @@ class CPU:
 		Execute one instruction from memory[PC]
 		"""
 		opcode_details = self.decode()
-		print(opcode_details["name"])
+		self.debug_print(opcode_details["name"])
 		length = int(opcode_details["length"])
 		
 		name = opcode_details["name"].split(" ")
@@ -83,7 +83,7 @@ class CPU:
 		# debug stuff
 		if self.pc in self.breakpoints:
 			bp_hit = self.breakpoints.index(self.pc)
-			print("Hit Breakpoint {}".format(bp_hit + 1))
+			self.debug_print("Hit Breakpoint {}".format(bp_hit + 1))
 			self.stepping = True
 
 		if self.is_debug and self.stepping:
@@ -100,7 +100,7 @@ class CPU:
 						addr = int(debug_args[1])
 					self.breakpoints.append(addr)
 					# breakpoints displayed as indexing at 1
-					print("Breakpoint {} set at {}".format(len(self.breakpoints), addr))
+					self.debug_print("Breakpoint {} set at {}".format(len(self.breakpoints), addr))
 				elif debug_args[0] == "continue" or debug_args[0] == "c":
 					self.stepping = False
 					break
@@ -108,12 +108,12 @@ class CPU:
 					# breakpoint numbers indexed at 1
 					bp = int(debug_args[1]) - 1
 					self.breakpoints[bp] = None # pc will never be None
-					print("Removed breakpoint {}".format(debug_args[1]))
+					self.debug_print("Removed breakpoint {}".format(debug_args[1]))
 				else:
 					try:
 						eval(cmd)
 					except Exception as e:
-						print(e)
+						self.debug_print(e)
 
 		# default new pc
 		new_pc = self.pc + length
@@ -171,7 +171,7 @@ class CPU:
 			if len(args) == 1 or self.check_cc(args[0]):
 				new_pc += self.get_immediate(1, signed=True)
 				if self.is_debug:
-					print("Jump taken!")
+					self.debug_print("Jump taken!")
 		elif mnemonic == "LD":
 			self.ld(args)
 		elif mnemonic == "LDH":
@@ -182,7 +182,7 @@ class CPU:
 				# LDH A,(a8)
 				self.a = self.memory[0xFF00 + self.get_immediate(1)]
 		elif mnemonic == "NOP":
-			pass
+			raise NotImplementedError
 		elif mnemonic == "POP":
 			if args[0] == "AF":
 				raise NotImplementedError
@@ -201,7 +201,7 @@ class CPU:
 				self.sp = self.sp + 2
 				new_pc = stack_val
 				if self.is_debug:
-					print("Return taken!")
+					self.debug_print("Return taken!")
 		elif mnemonic == "RL":
 			if args[0] == "(HL)":
 				val = self.memory[self.hl]
@@ -246,7 +246,7 @@ class CPU:
 				val = self.a ^ getattr(self, args[0].lower())
 			self.a = val
 		else:
-			print("Unkown operation: {}".format(mnemonic))
+			self.debug_print("Unkown operation: {}".format(mnemonic))
 			raise NotImplementedError
 
 		try:
@@ -342,8 +342,8 @@ class CPU:
 		all instructions have 1 byte for the opcode, so we always start 1 after the PC
 		"""
 		im = self.memory[self.pc+1:self.pc+1+size_in_bytes]
-		if self.debug:
-			print("\t{}".format(im))
+		if self.is_debug:
+			self.debug_print("\t{}".format(im))
 		im = int.from_bytes(im, self.endianness)
 
 		# the only signed immediates are 1 byte (r8 in JR and ADD instructions)
@@ -418,3 +418,6 @@ class CPU:
 				raise KeyError("Unknown opcode prefix: 0x{:x}".format(first_byte))
 		return opcode_details
 
+	def debug_print(self, to_print):
+		if False:
+			print(to_print)
