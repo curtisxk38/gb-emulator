@@ -21,7 +21,14 @@ class CPU:
 
 		# 64K RAM
 		self.memory = memory
-		self.interrupts_enabled = True
+		# interrupts: Vertical blanking, LCDC (STAT referenced), Timer overflow,
+		#  Serio I/O transfer completed, P10-P13 terminal negative edge
+		# technically the 2 registers below are actually memory mapped.
+		#  so they should be in self.memory, not variables ... ?
+		self.interrupt_enable = [True, True, True, True, True]
+		self.interrupt_requests = [False, False, False, False, False]
+		self.ime = True # interrupt master enable
+		self.interrupt_handlers = [0x0040, 0x0048, 0x0050, 0x0058, 0x0060]
 
 		opcode_details_file = "opcode_details.json"
 
@@ -256,6 +263,26 @@ class CPU:
 			# not sure if the next line is correct
 			self.set_flags(opcode_details["flags"], None)
 		self.pc = new_pc
+
+		self.handle_interupts()
+
+	def handle_interupts(self):
+		# if no interrupts are allowed, just return
+		if not self.ime:
+			return
+		# check if any interrupts are requested
+		for idx, interrupt in enumerate(self.interrupt_requests):
+			if interrupt and self.interrupts_enabled[idx]:
+				# reset this interrupt we are handling
+				self.interrupt_requests[idx] = False
+				# disable interupts
+				self.ime = False
+				# push old pc to stack
+				self.push_val(self.pc)
+				# set pc to address of this interrupt handler
+				#  aka jump to it
+				self.pc = self.interrupt_handlers[idx]
+				return
 
 	def ld(self, args):
 		"""
